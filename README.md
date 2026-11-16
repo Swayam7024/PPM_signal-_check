@@ -1,76 +1,98 @@
+<div align="center">
+
 # PPM Signal Checker
 
-A sketch that reads a PPM signal from an RC receiver and maps the first four channels to joystick axes.
+**Check your RC receiver's PPM output on a Teensy – live channel values on the Serial Monitor and as a USB joystick on your PC.**
 
-![Platform](https://img.shields.io/badge/Platform-Teensy-5C8AAB)
-![Language](https://img.shields.io/badge/Language-C%2B%2B-00599C?logo=cplusplus&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Status](https://img.shields.io/badge/Status-Work%20in%20progress-orange)
+![Teensy](https://img.shields.io/badge/Teensy-3.x%20%2F%204.x-5C8AAB?style=for-the-badge)
+![C++](https://img.shields.io/badge/C%2B%2B-Arduino-00599C?style=for-the-badge&logo=cplusplus&logoColor=white)
+![USB](https://img.shields.io/badge/USB-HID%20Joystick-2ECC71?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
+
+[Features](#features) · [Hardware](#hardware) · [Getting Started](#getting-started)
+
+</div>
+
+---
 
 ## Overview
 
-This project checks the PPM (Pulse Position Modulation) output of an RC receiver. It decodes the PPM stream with the `PulsePosition` library, reads channels 1–4, converts each from the standard 1000–2000 µs range to a 0–255 value and passes the result to a joystick object, so that the RC transmitter's sticks can be checked as joystick axes. The `PulsePosition` library targets Teensy boards.
+This project checks the PPM (Pulse Position Modulation) output of an RC receiver. A Teensy decodes the PPM stream with the `PulsePosition` library, prints every channel value (in µs) to the Serial Monitor, and sends the first six channels to the PC as USB joystick axes using the built-in Teensy `Joystick` API. That way the transmitter sticks and switches can be checked in the Serial Monitor, in any game-controller test tool, or used directly in an RC simulator.
 
 ## Features
 
 - Decodes a combined PPM signal on a single input pin
-- Reads the first four RC channels
-- Validates the channel values before using them
-- Maps each channel from 1000–2000 µs to 0–255
-- Sends the mapped values to joystick X / Y / Z axes
-- Short 10 ms loop delay
+- **Signal checker:** prints up to 8 channels to the Serial Monitor (115200 baud) 10 times per second
+- **Signal-loss detection:** prints `NO PPM SIGNAL` and centres the joystick if no frame arrives for 100 ms
+- Reads only when a new frame has arrived (`ppm.available()`)
+- **USB joystick output** (Teensy `Joystick` API), each channel mapped from 1000–2000 µs to 0–1023:
+
+| PPM channel | Joystick axis |
+|---|---|
+| CH1 | `Joystick.X()` |
+| CH2 | `Joystick.Y()` |
+| CH3 | `Joystick.Z()` |
+| CH4 | `Joystick.Zrotate()` |
+| CH5 | `Joystick.sliderLeft()` |
+| CH6 | `Joystick.sliderRight()` |
+
+Example Serial Monitor output:
+
+```
+8 ch | CH1: 1500 CH2: 1500 CH3: 1012 CH4: 1500 CH5: 1000 CH6: 2000 CH7: 1500 CH8: 1500
+```
 
 ## Hardware
 
 | Component | Purpose |
 |---|---|
-| Teensy board (supported by the `PulsePosition` library) | Decodes the PPM signal |
+| Teensy 3.x or 4.x board | Decodes the PPM signal, USB joystick |
 | RC transmitter + receiver with PPM output | Signal source |
-| USB cable | Power, programming and joystick connection to a PC |
+| USB cable | Power, programming, Serial Monitor and joystick connection to a PC |
 
 ## Pin Connections
 
-| Board Pin | Connected To |
+| Teensy Pin | Connected To |
 |---|---|
-| 2 | Receiver PPM output |
+| 6 | Receiver PPM output |
 | GND | Receiver ground |
 | 5V / VIN | Receiver power (check your receiver's voltage) |
 
+> The PPM input must be on a pin supported by `PulsePositionInput`. Pin 6 works on both Teensy 3.x and 4.x. Other options – Teensy 4.x: 9, 10, 11, 12, 13, 14, 15, 18, 19 · Teensy 3.x: 5, 9, 10, 20, 21, 22, 23. Change `PPM_PIN` in the sketch if you use another pin.
+
 ## How It Works
 
-1. `ppm.begin(2)` starts PPM decoding on pin 2.
-2. Each loop reads channels 1–4 with `ppm.read()`.
-3. If all four values are valid, each is mapped from 1000–2000 to 0–255.
-4. The mapped values are written to the joystick axes.
+1. `ppm.begin(PPM_PIN)` starts PPM decoding.
+2. Each time `ppm.available()` reports a new frame, all channels are read with `ppm.read()`.
+3. Channels 1–6 are mapped from 1000–2000 µs to 0–1023 and sent together with `Joystick.send_now()`.
+4. Every 100 ms the channel values (or `NO PPM SIGNAL`) are printed to the Serial Monitor.
 
 ## Getting Started
 
-1. Install the [Arduino IDE](https://www.arduino.cc/en/software) and the [Teensyduino](https://www.pjrc.com/teensy/td_download.html) board package.
-2. Libraries used by the sketch:
-   - `PulsePosition` – included with Teensyduino
-   - `Joystick` – a joystick library providing the `Joystick` class used in the sketch
-3. Open `PPM signal checker/ppm signal check.ino`. The Arduino IDE expects the sketch file and its folder to have the same name, so it may offer to move the file into a matching folder.
-4. Select your Teensy board under **Tools → Board** and, if required, a USB type that includes Joystick under **Tools → USB Type**.
+1. Install the [Arduino IDE](https://www.arduino.cc/en/software) and the [Teensyduino](https://www.pjrc.com/teensy/td_download.html) board package. `PulsePosition` and the USB `Joystick` support are included with Teensyduino – no extra libraries needed.
+2. Open `ppm_signal_checker/ppm_signal_checker.ino`.
+3. Select your Teensy board under **Tools → Board**.
+4. Set **Tools → USB Type → "Serial + Keyboard + Mouse + Joystick"**. Without it the sketch fails with `'Joystick' was not declared`.
 5. Click **Upload**.
+6. Open the Serial Monitor at **115200 baud** to see the channel values, and/or open your PC's game-controller settings to see the joystick axes move.
 
-> **Note:** the joystick calls in the sketch (`printX`, `printY`, `printZ`, `print`) do not match the standard Teensy `Joystick` API, so this part is still being worked on and may need adapting to your joystick library.
+PlatformIO users: add `build_flags = -D USB_SERIAL_HID` to `platformio.ini` for the same USB type.
 
 ## Project Structure
 
 ```
 PPM_signal-_check/
-├── PPM signal checker/
-│   └── ppm signal check.ino   # PPM decoding and joystick mapping sketch
+├── ppm_signal_checker/
+│   └── ppm_signal_checker.ino   # PPM decoding, serial checker and USB joystick sketch
 ├── LICENSE
 └── README.md
 ```
 
 ## Future Improvements
 
-- Update the joystick output to the standard Teensy USB Joystick API (`Joystick.X()`, `Joystick.Y()`, etc.)
-- Print all channel values to the Serial Monitor for quick signal checking
-- Support more than four channels and detect signal loss
-- Use `ppm.available()` to read only when a new frame has arrived
+- Map channels 7–8 to joystick buttons
+- Show a frame-rate counter and channel min/max values for receiver diagnostics
+- SBUS / iBUS input support
 
 ## Author
 
